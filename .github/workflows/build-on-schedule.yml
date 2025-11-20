@@ -39,9 +39,10 @@ jobs:
     needs: prepare_build
     strategy:
       matrix:
-        device_name: [comet, komodo, caiman, husky, tangorpro, felix, cheetah, frankel, blazer, mustang]
+        #device_name: [comet, komodo, caiman, husky, tangorpro, felix, cheetah, frankel, blazer, mustang]
+        device_name: [blazer]
 
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
