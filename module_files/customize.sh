@@ -1,4 +1,4 @@
-#!/system/bin/sh
+#!/system/bin/busybox sh
 
 # Function to find build & system properties within a specified directory.
 find_prop_files() {
@@ -44,10 +44,13 @@ checksum_sha256() {
     done
 }
 
-# Define the path of busybox using find and set it to $PATH then export it
+# Prevent the case module is set to be removed at install
+[ -f "$MODPATH/remove" ] && rm -f "$MODPATH/remove"
+
+# Define the path of root manager applet bin directories using find and set it to $PATH then export it
 if ! command -v busybox >/dev/null 2>&1; then
-    BUSYBOX_PATH=$(find "/data/adb" -maxdepth 3 -name busybox -exec dirname {} \; | tr '\n' ':')
-    export PATH="$PATH:${BUSYBOX_PATH%:}"
+    TOYS_PATH=$(find "/data/adb" -maxdepth 3 \( -name busybox -o -name ksu_susfs \) -exec dirname {} \; | sort -u | tr '\n' ':')
+    export PATH="${PATH:+${PATH}:}${TOYS_PATH%:}"
 fi
 
 # Define the props path
@@ -91,10 +94,13 @@ if [ "$SYSPROP_SDK" -lt "$MODPROP_SDK" ]; then
 fi
 
 # Print head message
-ui_print "- Installing, $MODPROP_MODEL ($MODPROP_PRODUCT) [A$MODPROP_VERSION-S$MODPROP_VERSIONCODE] - $MODPROP_MONTH $MODPROP_YEAR"
+ui_print "- Installing, $MODPROP_MODEL ($MODPROP_PRODUCT) [A$MODPROP_VERSION-SP$MODPROP_VERSIONCODE] - $MODPROP_MONTH $MODPROP_YEAR"
 
 # Checksum SHA256
 checksum_sha256
+
+# Running the gms_doze using busybox
+# [ -f "$MODPATH/gms_doze.sh" ] && busybox sh "$MODPATH"/gms_doze.sh 2>&1
 
 # Running the action early using busybox
 [ -f "$MODPATH/action.sh" ] && busybox sh "$MODPATH"/action.sh 2>&1

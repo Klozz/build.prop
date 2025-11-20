@@ -27,7 +27,7 @@ for file in ./dl/*; do                                      # Iterate through fi
 
 			# Skip image if it failed to get extracted
 			if ! 7z e "$file" -o"$EAI" "payload.bin" -r &>/dev/null; then
-				print_message "Failed to extract payload.bin from $file using 7z. Skipping…\n" error
+				print_message "Failed to extract payload.bin from $file using 7z. Skipping…\n" warning
 				continue
 			fi
 
@@ -39,13 +39,13 @@ for file in ./dl/*; do                                      # Iterate through fi
 
 			# Skip image if it failed to get extracted
 			if ! 7z e "$file" -o"$EAI_BP" -r -y &>/dev/null; then
-				print_message "Failed to extract everything from $file. Skipping…" error
+				print_message "Failed to extract everything from $file. Skipping…" warning
 				continue
 			fi
 		fi
 
-		# We dont need the archive anymore
-		# rm "$file"
+		# We dont need the downloaded archive image anymore
+		rm "$file"
 
 		# Time the extraction
 		extraction_end=$(date +%s)
@@ -79,7 +79,7 @@ if [ -d "$EAI_BP" ]; then
 
 					# Skip image if it failed to get extracted
 					if ! payload_dumper "$file" --partitions="$partitionsArgs" --out="$EI_BP/$basename" 2>/dev/null; then
-						print_message "Failed to extract $file using Android OTA Dumper. Skipping…\n" error
+						print_message "Failed to extract $file using Android OTA Dumper. Skipping…\n" warning
 						rm -rf "$EI_BP/$basename" # TODO: Use "${var:?}" to ensure this never expands to / .
 						continue
 					fi
@@ -89,7 +89,7 @@ if [ -d "$EAI_BP" ]; then
 
 						# Skip image if it failed to get extracted
 						if ! 7z e "$file" -o"$EI_BP/$basename" "$image_name.img" -r &>/dev/null; then
-							print_message "Failed to extract $image_name.img from $file using 7z. Skipping…\n" error
+							print_message "Failed to extract $image_name.img from $file using 7z. Skipping…\n" warning
 							rm -rf "$EI_BP/$basename/$image_name.img"
 							continue
 						fi
@@ -97,7 +97,7 @@ if [ -d "$EAI_BP" ]; then
 				fi
 
 				# We dont need the image anymore
-				# rm "$file"
+				rm "$file"
 
 				# Time the extraction
 				extraction_end=$(date +%s)
@@ -136,6 +136,18 @@ for dir in "$EI"/*; do  # List directory ./*
 
 		# Print the extraction time
 		print_message "Extraction time: $extraction_runtime seconds\n" debug
+	fi
+done
+
+# Build props, feature and module files after extraction
+[ -d "$EI" ] && print_message "Building module props and features…\n" info
+for dir in "$EI"/*; do  # List directory ./*
+	if [ -d "$dir" ]; then # Check if it is a directory
+		dir=${dir%*/}         # Remove last /
+		print_message "Processing \"${dir##*/}\"…" info
+
+		# Time the extraction
+		extraction_start=$(date +%s)
 
 		# Build system.prop
 		print_message "Building props…" info
@@ -152,6 +164,13 @@ for dir in "$EI"/*; do  # List directory ./*
 
 		# Build Magisk module
 		print_message "Building module…" info
-		./build_magisk_module.sh "$dir"
+		./build_module.sh "$dir"
+
+		# Time the extraction
+		extraction_end=$(date +%s)
+		extraction_runtime=$((extraction_end - extraction_start))
+
+		# Print the build time
+		print_message "Build time: $extraction_runtime seconds\n" debug
 	fi
 done
