@@ -2,7 +2,7 @@ name: Build props (on schedule)
 
 permissions:
   contents: write
-  
+
 on:
   workflow_dispatch:
   schedule:
@@ -15,6 +15,7 @@ jobs:
     outputs:
       upload_url: ${{ steps.create_release.outputs.upload_url }}
       id: ${{ steps.create_release.outputs.id }}
+      tag_name: ${{ steps.get_tag_name.outputs.tag_name }}
 
     steps:
       - name: Determine tag name
@@ -39,10 +40,11 @@ jobs:
     needs: prepare_build
     strategy:
       matrix:
-        #device_name: [comet, komodo, caiman, husky, tangorpro, felix, cheetah, frankel, blazer, mustang]
         device_name: [blazer]
+        # device_name: [comet, komodo, caiman, husky, tangorpro, felix, cheetah, frankel, blazer, mustang]
 
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -52,7 +54,7 @@ jobs:
       - name: Install APT packages
         run: sudo apt install -y dos2unix
 
-      - name: Activate venv
+      - name: Activate virtualenv
         run: |
           python3 -m venv .venv/
           . .venv/bin/activate
@@ -64,7 +66,7 @@ jobs:
       - name: Make all scripts executable
         run: chmod +x *.sh
 
-      - name: Download latest OTA build
+      - name: Download latest OTA
         run: ./download_latest_ota_build.sh ${{ matrix.device_name }}
 
       - name: Extract images and build
@@ -75,7 +77,6 @@ jobs:
         id: check_build_id
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        shell: bash
         run: |
           BASENAME="${{ steps.extract_and_build.outputs.module_base_name }}"
           BUILD_ID="${{ steps.extract_and_build.outputs.device_build_id }}"
@@ -87,6 +88,7 @@ jobs:
           for TAG in $RELEASES; do
             RELEASE_BODY=$(gh release view "$TAG" --json body -q .body || true)
             if [[ "$RELEASE_BODY" == *"${BASENAME}_${BUILD_ID}"* ]]; then
+              echo "Found existing build for $TAG"
               BUILD_EXISTS=true
               break
             fi
@@ -96,11 +98,14 @@ jobs:
 
       - name: Upload module file
         if: steps.check_build_id.outputs.BUILD_EXISTS == 'false'
-        uses: softprops/action-gh-release@v1
-        with:
-          files: ./${{ steps.extract_and_build.outputs.module_base_name }}.zip
+        uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.prepare_build.outputs.upload_url }}
+          asset_path: ./${{ steps.extract_and_build.outputs.module_base_name }}.zip
+          asset_name: ${{ steps.extract_and_build.outputs.module_base_name }}.zip
+          asset_content_type: application/zip
 
       - name: Add information to release
         if: steps.check_build_id.outputs.BUILD_EXISTS == 'false'
